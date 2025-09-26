@@ -223,4 +223,4 @@ CORS_ALLOW_METHODS = [
 CORS_PREFLIGHT_MAX_AGE = 3600
 
 # Rate limiting
-RATE_LIMIT_ENABLE = config('RATE_LIMIT_ENABLE', default=True, cast=bool)
+RATE_LIMIT_ENABLE = config('RATE_LIMIT_ENABLE', default=False, cast=bool)
