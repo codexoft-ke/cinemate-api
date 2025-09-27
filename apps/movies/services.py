@@ -14,6 +14,7 @@ class TMDbService:
     def __init__(self):
         self.base_url = settings.TMDB_BASE_URL
         self.access_token = settings.TMDB_ACCESS_TOKEN
+        self.youtube_api_key = getattr(settings, 'YOUTUBE_API_KEY', None)
         self.headers = {
             'Authorization': f'Bearer {self.access_token}',
             'Content-Type': 'application/json'
@@ -272,6 +273,54 @@ class TMDbService:
                 for member in item['credits']['cast'][:10]  # Limit to top 10
             ]
         
+        # Format videos (trailers, teasers, clips, etc.) - YouTube only
+        videos = []
+        if 'videos' in item and 'results' in item['videos']:
+            # Filter only YouTube videos
+            youtube_videos = [v for v in item['videos']['results'] if v.get('site') == 'YouTube']
+            
+            # Sort videos by priority (trailers first, then teasers, clips, etc.)
+            video_priority = {
+                'Trailer': 1,
+                'Teaser': 2,
+                'Clip': 3,
+                'Featurette': 4,
+                'Behind the Scenes': 5,
+                'Bloopers': 6
+            }
+            
+            sorted_videos = sorted(
+                youtube_videos,
+                key=lambda v: (
+                    video_priority.get(v.get('type', ''), 999),
+                    -v.get('size', 0),  # Higher quality first
+                    v.get('published_at', '')  # More recent first
+                )
+            )
+            
+            # Get YouTube statistics for each video
+            for video in sorted_videos[:10]:  # Limit to 10 videos
+                youtube_stats = self._get_youtube_video_stats(video['key'])
+                
+                videos.append({
+                    "id": video['id'],
+                    "iso_639_1": video.get('iso_639_1'),
+                    "iso_3166_1": video.get('iso_3166_1'),
+                    "key": video['key'],
+                    "name": video['name'],
+                    "site": video['site'],
+                    "size": video.get('size', 720),
+                    "type": video['type'],
+                    "official": video.get('official', False),
+                    "published_at": video.get('published_at'),
+                    "url": f"https://www.youtube.com/watch?v={video['key']}",
+                    "thumbnail": f"https://img.youtube.com/vi/{video['key']}/hqdefault.jpg",
+                    "views": youtube_stats.get('view_count'),
+                    "likes": youtube_stats.get('like_count'),
+                    "duration": youtube_stats.get('duration'),
+                    "description": youtube_stats.get('description', '')[:200] + '...' if youtube_stats.get('description', '') else ''
+                })
+        
         # Format reviews
         reviews = []
         if 'reviews' in item and 'results' in item['reviews']:
@@ -352,6 +401,7 @@ class TMDbService:
             "synopsis": item.get('overview', ''),
             "homepage": item.get('homepage'),
             "cast": cast,
+            "videos": videos,
             "reviews": reviews,
             "recommendations": recommendations
         }
@@ -361,6 +411,88 @@ class TMDbService:
             result["seasons"] = seasons
         
         return result
+    
+    def _get_youtube_video_stats(self, video_id: str) -> dict:
+        """Get YouTube video statistics including view count, likes, duration, etc."""
+        if not self.youtube_api_key:
+            return {}
+        
+        # Check cache first
+        cache_key = f"youtube_stats_{video_id}"
+        cached_stats = cache.get(cache_key)
+        if cached_stats:
+            return cached_stats
+        
+        try:
+            # YouTube Data API v3 endpoint
+            url = "https://www.googleapis.com/youtube/v3/videos"
+            params = {
+                'id': video_id,
+                'key': self.youtube_api_key,
+                'part': 'statistics,contentDetails,snippet'
+            }
+            
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'items' in data and data['items']:
+                video_data = data['items'][0]
+                stats = {}
+                
+                # Get statistics
+                if 'statistics' in video_data:
+                    statistics = video_data['statistics']
+                    stats['view_count'] = int(statistics.get('viewCount', 0))
+                    stats['like_count'] = int(statistics.get('likeCount', 0))
+                    stats['comment_count'] = int(statistics.get('commentCount', 0))
+                
+                # Get duration from contentDetails
+                if 'contentDetails' in video_data:
+                    duration_iso = video_data['contentDetails'].get('duration', '')
+                    stats['duration'] = self._parse_youtube_duration(duration_iso)
+                
+                # Get description from snippet
+                if 'snippet' in video_data:
+                    stats['description'] = video_data['snippet'].get('description', '')
+                    stats['published_at'] = video_data['snippet'].get('publishedAt', '')
+                    stats['channel_title'] = video_data['snippet'].get('channelTitle', '')
+                
+                # Cache for 1 hour
+                cache.set(cache_key, stats, 3600)
+                return stats
+            
+        except requests.RequestException as e:
+            print(f"YouTube API error: {e}")
+        
+        return {}
+    
+    def _parse_youtube_duration(self, duration_iso: str) -> str:
+        """Parse YouTube ISO 8601 duration format (PT4M13S) to readable format"""
+        if not duration_iso:
+            return ""
+        
+        try:
+            import re
+            # Remove PT prefix
+            duration = duration_iso.replace('PT', '')
+            
+            # Extract hours, minutes, seconds
+            hours = re.findall(r'(\d+)H', duration)
+            minutes = re.findall(r'(\d+)M', duration)
+            seconds = re.findall(r'(\d+)S', duration)
+            
+            h = int(hours[0]) if hours else 0
+            m = int(minutes[0]) if minutes else 0
+            s = int(seconds[0]) if seconds else 0
+            
+            if h > 0:
+                return f"{h}:{m:02d}:{s:02d}"
+            else:
+                return f"{m}:{s:02d}"
+                
+        except Exception:
+            return ""
     
     def sync_genres(self):
         """Sync genres from TMDb to local database"""

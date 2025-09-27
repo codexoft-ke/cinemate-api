@@ -187,7 +187,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8081",
     "http://127.0.0.1:8081",
-    "http://192.168.11.143:8081",
+    "http://192.168.134.51:8081",
+    "http://10.42.0.1:8081"
 ]
 
 # Allow all origins during development (can be more restrictive in production)
