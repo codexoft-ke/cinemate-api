@@ -191,7 +191,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8081",
     "http://127.0.0.1:8081",
     "http://192.168.134.51:8081",
-    "http://10.42.0.1:8081"
+    "http://10.42.0.1:8081",
+    "https://cinemate-f2x.pages.dev"
 ]
 
 # Allow all origins during development (can be more restrictive in production)
