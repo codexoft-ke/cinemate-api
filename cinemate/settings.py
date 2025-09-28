@@ -167,6 +167,9 @@ CACHE_TTL = config('CACHE_TTL', default=300, cast=int)
 TMDB_ACCESS_TOKEN = config('TMDB_ACCESS_TOKEN')
 TMDB_BASE_URL = config('TMDB_BASE_URL', default='https://api.themoviedb.org/3')
 
+# YouTube API settings
+YOUTUBE_API_KEY = config('YOUTUBE_API_KEY')
+
 # JWT settings
 JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
 JWT_ALGORITHM = config('JWT_ALGORITHM', default='HS256')

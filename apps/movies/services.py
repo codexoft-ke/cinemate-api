@@ -246,6 +246,20 @@ class TMDbService:
             "is_series": is_series
         }
     
+    def _format_view_count(self, count: int) -> str:
+        """Format large numbers to readable format (k, m, b)"""
+        if not count or count == 0:
+            return "0"
+        
+        if count < 1000:
+            return str(count)
+        elif count < 1000000:
+            return f"{count / 1000:.1f}k".rstrip('0').rstrip('.')
+        elif count < 1000000000:
+            return f"{count / 1000000:.1f}m".rstrip('0').rstrip('.')
+        else:
+            return f"{count / 1000000000:.1f}b".rstrip('0').rstrip('.')
+    
     def format_movie_details(self, item: dict, user: User = None) -> dict:
         """Format movie details for API response"""
         is_series = item.get('is_series', False) or 'first_air_date' in item
@@ -315,7 +329,7 @@ class TMDbService:
                     "published_at": video.get('published_at'),
                     "url": f"https://www.youtube.com/watch?v={video['key']}",
                     "thumbnail": f"https://img.youtube.com/vi/{video['key']}/hqdefault.jpg",
-                    "views": youtube_stats.get('view_count'),
+                    "views": self._format_view_count(youtube_stats.get('view_count')),
                     "likes": youtube_stats.get('like_count'),
                     "duration": youtube_stats.get('duration'),
                     "description": youtube_stats.get('description', '')[:200] + '...' if youtube_stats.get('description', '') else ''

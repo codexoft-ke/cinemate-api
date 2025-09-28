@@ -301,20 +301,45 @@ class ChangePasswordView(APIView):
             serializer.errors
         )
 
-
 class RefreshTokenView(APIView):
     """Refresh token endpoint"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def post(self, request):
+        # Get token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return error_response(
+                "Authentication token required",
+                "TOKEN_REQUIRED",
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
+        
         try:
-            # Get current token from request
-            auth_header = request.META.get('HTTP_AUTHORIZATION')
             token = auth_header.split(' ')[1]
-            payload = JWTService.decode_token(token)
             
-            # Validate session
-            session = JWTService.validate_session(payload['session_id'])
+            # Decode token ignoring expiration for refresh operations
+            payload = JWTService.decode_token_ignore_expiration(token)
+            
+            # Validate it's an access token
+            if payload.get('type') != 'access_token':
+                return error_response(
+                    "Invalid token type",
+                    "INVALID_TOKEN_TYPE",
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Check required fields
+            session_id = payload.get('session_id')
+            if not session_id:
+                return error_response(
+                    "Token missing session information",
+                    "INVALID_TOKEN_STRUCTURE",
+                    status_code=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Validate session exists and is active
+            session = JWTService.validate_session(session_id)
             if not session:
                 return error_response(
                     "Session expired or invalid",
@@ -323,20 +348,24 @@ class RefreshTokenView(APIView):
                 )
             
             # Generate new access token
-            new_access_token = JWTService.generate_access_token(request.user, session.id)
+            new_access_token = JWTService.generate_access_token(session.user, session.id)
             
             return success_response({
                 "auth_token": new_access_token
             }, "Token refreshed successfully")
             
+        except (ValueError, KeyError) as e:
+            return error_response(
+                "Invalid or expired token",
+                "INVALID_TOKEN",
+                status_code=status.HTTP_401_UNAUTHORIZED
+            )
         except Exception as e:
             return error_response(
                 "Failed to refresh token",
                 "REFRESH_FAILED",
-                status_code=status.HTTP_401_UNAUTHORIZED
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
 class LogoutView(APIView):
     """Logout endpoint"""
     permission_classes = [IsAuthenticated]

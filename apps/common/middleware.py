@@ -68,7 +68,7 @@ class RateLimitMiddleware(MiddlewareMixin):
         if '/auth/' in path:
             return {'requests': 5, 'window': 60}  # 5 requests per minute
         elif '/movies/search' in path:
-            return {'requests': 30, 'window': 60}  # 30 requests per minute
+            return None  # No rate limiting for search
         elif '/movies/' in path:
             return {'requests': 100, 'window': 60}  # 100 requests per minute
         elif '/profile/' in path:

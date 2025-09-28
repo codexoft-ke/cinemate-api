@@ -56,6 +56,36 @@ class JWTService:
             raise ValueError("Invalid token")
     
     @staticmethod
+    def decode_token_ignore_expiration(token):
+        """
+        Decode JWT token ignoring expiration - used for refresh token operations
+        """
+        try:
+            # Decode without verifying expiration
+            payload = jwt.decode(
+                token, 
+                settings.JWT_SECRET_KEY, 
+                algorithms=[settings.JWT_ALGORITHM],
+                options={"verify_exp": False}  # This ignores expiration
+            )
+            return payload
+        except jwt.InvalidTokenError as e:
+            raise ValueError(f"Invalid token: {str(e)}")
+    
+    @staticmethod
+    def is_token_expired(token):
+        """
+        Check if token is expired without raising exception
+        """
+        try:
+            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+            return False  # Token is valid and not expired
+        except jwt.ExpiredSignatureError:
+            return True  # Token is expired
+        except jwt.InvalidTokenError:
+            return True  # Token is invalid
+    
+    @staticmethod
     def create_login_session(user, ip_address, platform='mobile-app', device_name=None):
         """Create a new login session"""
         refresh_token = JWTService.generate_refresh_token()

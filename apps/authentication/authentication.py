@@ -14,10 +14,12 @@ class JWTAuthentication(BaseAuthentication):
         unauthenticated_paths = [
             '/auth/signup',
             '/auth/login',
+            '/auth/refresh-token',  # Keep this here - refresh handles its own auth
             '/auth/forgot-password',
+            '/auth/verify-otp',
+            '/auth/change-password',
             '/movies/genres',
         ]
-
         if request.path in unauthenticated_paths:
             return None
 
